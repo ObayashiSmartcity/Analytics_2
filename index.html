@@ -532,7 +532,7 @@
 
     .pi {
       display: flex;
-      gap: 16px;
+      gap: 166px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -972,6 +972,10 @@
         <div class="fg"><label>年代</label><div class="ms-wrap" id="fA"><button type="button" class="ms-toggle">すべて ▾</button><div class="ms-dropdown"></div></div></div>
         <div class="fg"><label>エリアグループ</label><div class="ms-wrap" id="fAG"><button type="button" class="ms-toggle">すべて ▾</button><div class="ms-dropdown"></div></div></div>
         <div class="fg"><label>エリア</label><div class="ms-wrap" id="fAR"><button type="button" class="ms-toggle">すべて ▾</button><div class="ms-dropdown"></div></div></div>
+        <div class="fg">
+          <label>最寄り距離 (km以内)</label>
+          <input type="number" id="fDistance" step="0.01" min="0" placeholder="制限なし">
+        </div>
         <div class="fg"><label>WB指標</label><div class="ms-wrap" id="fC"><button type="button" class="ms-toggle">すべて ▾</button><div class="ms-dropdown"></div></div></div>
         <div class="fg"><label>投稿日（開始）</label><input type="date" id="fDF"></div>
         <div class="fg"><label>投稿日（終了）</label><input type="date" id="fDT"></div>
@@ -1160,7 +1164,9 @@
         theme: window.DEFAULT_THEME || 'light',
         map: null,
         mapMarkerGroup: null,
-        charts: { ch1: null, ch2: null, ch3: null }
+        charts: { ch1: null, ch2: null, ch3: null },
+        // 最寄り距離のデフォルト設定（config.jsにwindow.DEFAULT_DISTANCEがあれば適用、なければ制限なし）
+        defaultDistance: window.DEFAULT_DISTANCE !== undefined ? window.DEFAULT_DISTANCE : ''
       };
 
       // 定数設定
@@ -1218,6 +1224,10 @@
           if (!Array.isArray(json)) throw new Error('データ形式が正しくありません (Array想定)');
 
           state.raw = json;
+          
+          // 距離のデフォルト値をインプットフィールドに初期設定
+          $('fDistance').value = state.defaultDistance;
+
           initFilters();
           bindEvents();
           applyFilters();
@@ -1325,6 +1335,7 @@
           $(id).addEventListener('input', applyFilters);
         });
         $('fExclude').addEventListener('input', applyFilters);
+        $('fDistance').addEventListener('input', applyFilters); // 距離フィルターの入力変更イベントを追加
 
         $('rb').addEventListener('click', () => {
           ['fT', 'fG', 'fA', 'fAG', 'fAR', 'fC'].forEach(id => {
@@ -1334,6 +1345,7 @@
           $('fDF').value = '';
           $('fDT').value = '';
           $('fExclude').value = '';
+          $('fDistance').value = state.defaultDistance; // リセット時は初期のデフォルト値に戻す
           applyFilters();
         });
 
@@ -1423,6 +1435,7 @@
           age: getMultiSelectValues('fA'),
           areaGroup: getMultiSelectValues('fAG'),
           area: getMultiSelectValues('fAR'),
+          distance: $('fDistance').value, // 距離フィルターの値を取得
           category: getMultiSelectValues('fC'),
           dateFrom: $('fDF').value,
           dateTo: $('fDT').value
@@ -1439,6 +1452,14 @@
           if (filters.age.length && !filters.age.includes(d.age_group)) return false;
           if (filters.areaGroup.length && !filters.areaGroup.includes(d.nearest_AreaGroup)) return false;
           if (filters.area.length && !filters.area.includes(d.nearest_Area)) return false;
+
+          // 最寄り距離フィルターの適用 (指定数値を超えていれば除外)
+          if (filters.distance !== '') {
+            const dist = Number(d.nearest_distance_km);
+            const limit = Number(filters.distance);
+            if (isNaN(dist) || dist > limit) return false;
+          }
+
           if (filters.category.length && !filters.category.includes(d.category)) return false;
 
           if (filters.dateFrom || filters.dateTo) {
